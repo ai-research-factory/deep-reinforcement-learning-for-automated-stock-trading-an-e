@@ -136,9 +136,77 @@ df = df.set_index("timestamp")
 4. 目標は「論文の手法が動くこと」であり、「論文と同じデータを揃えること」ではない
 
 
+## スコア推移
+Cycle 1: 60%
 
 
 
+## 前回の結果
+# Technical Findings — Cycle 2: Data Pipeline and Feature Engineering
+
+## Implementation Summary
+
+### Data Pipeline (`src/data/downloader.py`)
+- Implemented `download_djia_data()` function that fetches OHLCV data from the ARF Data API
+- Downloads 17 available DJIA component stocks (out of 30 total) for the period 2009-01-01 to 2022-12-31
+- Rate-limited requests (0.5s between tickers) to avoid API overload
+- Output: `data/raw/djia_data.csv` with 59,908 rows (17 tickers x 3,524 trading days)
+
+### Feature Engineering (`src/features/build_features.py`)
+- Implemented `add_technical_indicators()` function with the following indicators:
+  - **RSI(14)**: Relative Strength Index using EWM (Wilder's smoothing)
+  - **MACD(12, 26, 9)**: MACD line, signal line, and histogram
+  - **Bollinger Bands(20, 2)**: Upper, middle, and lower bands
+  - **Daily return**: Close-to-close percentage change
+  - **Volume change**: Volume percentage change
+  - **Close-open ratio**: Intraday price movement indicator
+  - **High-low spread**: Normalized daily price range
+- All indicators computed per-ticker with proper grouping
+- Warmup rows (33 per ticker, 561 total) dropped to eliminate NaN from indicator initialization
+- Output: `data/processed/djia_processed.feather` with 59,347 rows and 18 columns
+
+### Data Integrity
+- Zero NaN values in the processed dataset
+- No future data leakage confirmed (all rolling windows use `center=False`, all EWMs are backward-looking)
+- No duplicate ticker-date combinations
+- RSI values bounded within [0, 100]
+- Bollinger Band ordering verified: upper >= middle >= lower
+- 13/13 tests passing
+
+## Key Observations
+
+1. **Universe Coverage**: 17/30 DJIA stocks available via ARF API (56.7%). Missing stocks documented in `docs/open_questions.md`. This is a known limitation that may reduce diversification benefits in the ensemble strategy.
+
+2. **Data Quality**: All 17 tickers have identical date coverage (3,524 trading days from 2009-01-02 to 2022-12-30), making panel alignment straightforward.
+
+3. **Indicator Parameters**: All match the paper specification — RSI(14), MACD(12,26,9), Bollinger Bands(20,2).
+
+4. **Trading Metrics**: All trading-related metrics (Sharpe, returns, etc.) are set to 0.0 in metrics.json as this phase covers data pipeline only. These will be populated in subsequent phases.
+
+## Files Created/Modified
+- `src/data/__init__.py` — Package init
+- `src/data/downloader.py` — ARF API data downloader
+- `src/features/__init__.py` — Package init
+- `src/features/build_features.py` — Technical indicator computation
+- `tests/test_data_integrity.py` — 13 tests for data integrity and leakage prevention
+- `notebooks/01_data_exploration.ipynb` — Data exploration and visualization notebook
+- `reports/cycle_2/preflight.md` — Preflight checks
+- `reports/cycle_2/metrics.json` — Metrics (data phase, trading metrics N/A)
+- `reports/cycle_2/technical_findings.md` — This file
+- `docs/open_questions.md` — Open questions and limitations
+
+
+
+
+## レビューからのフィードバック
+### レビュー改善指示
+1. 【最重要】ユニバース再現性の向上計画の策定：次サイクルでモデル実装に入る前に、データソース問題を解決する。`src/data/downloader.py`を修正し、論文同様に`yfinance`ライブラリをフォールバックとして使用し、ARF APIで取得できない残り13銘柄を補完する機能を実装する。`DJIA_30_FULL`リストを活用し、30銘柄全てを揃えることを目指す。これにより`universeFidelity`が向上し、再現実験の信頼性が高まる。
+2. 【重要】特徴量セットの明確化と分離：`src/features/build_features.py`の`add_technical_indicators`関数に、論文準拠の特徴量のみを生成する`strict=True`のようなフラグを追加する。デフォルトでは論文通りの特徴量セットとし、追加特徴量はオプションで生成できるようにする。これにより、純粋な再現実験と、特徴量を追加した拡張実験を明確に区別できるようになる。
+3. 【推奨】ベースライン戦略データセットの準備：次のサイクルでRLモデルと比較するために、単純なベースライン戦略（例：Buy & Hold）の評価に必要なデータを準備する。例えば、`reports/cycle_2/metrics.json`に`baseline_1n_sharpe`等の項目があるが、これを計算するためのポートフォリオレベルの価格系列（例：均等加重ポートフォリオのインデックス）を`data/processed/baseline_data.feather`として生成するスクリプトを`src/features`に追加する。
+### マネージャー指示 (次のアクション)
+1. 【最優先】`src/data/get_raw_data.py`を修正し、ARF APIで取得できないDJIA 13銘柄を補完するため、`yfinance`ライブラリを代替データソースとして利用するロジックを追加する。取得したデータは既存のパイプラインと互換性のある形式に整形し、`data/raw`ディレクトリに保存すること。
+2. 【重要】`tests/test_data_integrity.py`に、`data/processed`に保存された最終的なfeatherファイルがDJIA 30銘柄すべてのデータを含んでいることを検証するテスト `test_universe_completeness` を追加する。このテストは `len(df['tic'].unique()) == 30` をアサーションすること。
+3. 【推奨】`src/features/build_features.py`に、論文で指定された特徴量（RSI, MACD, BB）のみを生成するモードを追加する。具体的には、`config.yml`に`features.use_paper_only: true`のような設定項目を設け、このフラグに応じて追加特徴量の計算をスキップするロジックを実装する。これにより、論文再現と独自探索の切り替えを容易にする。
 
 
 ## 全体Phase計画 (参考)
