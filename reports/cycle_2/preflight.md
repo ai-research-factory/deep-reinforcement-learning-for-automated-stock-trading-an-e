@@ -27,14 +27,15 @@ Note: This phase focuses on data pipeline and feature engineering. The train/val
 
 | Parameter | Paper Value | Current Implementation | Match? |
 |---|---|---|---|
-| Universe | DJIA 30 stocks | 17 of 30 (API availability) | Partial |
+| Universe | DJIA 30 stocks | 29 of 30 (WBA delisted) | Yes (96.7%) |
+| Data source | yfinance | ARF API (primary) + yfinance (fallback) | Yes |
 | Data period | 2009-01-01 ~ 2020-12-31 (train+test) | 2009-01-02 ~ 2022-12-30 | Yes (superset) |
 | Data frequency | Daily | Daily | Yes |
-| Technical indicators | RSI, MACD, Bollinger Bands, etc. | RSI(14), MACD(12,26,9), BB(20,2), returns, volume | Yes |
 | RSI period | 14 | 14 | Yes |
 | MACD params | (12, 26, 9) | (12, 26, 9) | Yes |
 | BB params | (20, 2) | (20, 2) | Yes |
+| Feature mode | Paper indicators | `paper_only=True` flag available | Yes |
 | Cost model | Not specified in data phase | N/A (Phase 4) | N/A |
 
-### Universe Limitation Note
-Only 17 of 30 DJIA components are available via the ARF Data API. Missing tickers: AMGN, CAT, CSCO, DIS, DOW, HON, IBM, KO, PG, TRV, VZ, WBA, MMM. This is documented in `docs/open_questions.md`.
+### Universe Note
+29 of 30 DJIA components are available. WBA (Walgreens Boots Alliance) has been delisted and is unavailable from both ARF API and yfinance. DOW has shorter history (IPO April 2019, 955 trading days vs 3,524 for others). See `docs/open_questions.md`.

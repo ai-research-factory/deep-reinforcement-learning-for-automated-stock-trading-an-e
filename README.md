@@ -16,23 +16,24 @@ pytest tests/
 
 ## Data
 
-Data is fetched from the ARF Data API at runtime. Do not commit data files.
+Data is fetched from the ARF Data API (primary) with yfinance fallback at runtime. Do not commit data files.
 
 ```bash
-# Download DJIA data
+# Download DJIA data (ARF API + yfinance fallback)
 python3 -m src.data.downloader
 
-# Process features
+# Process features and generate baseline data
 python3 -m src.features.build_features
 ```
 
 ### Data Pipeline (Cycle 2)
 
-- **Source**: ARF Data API (`https://ai.1s.xyz/api/data/ohlcv`)
-- **Universe**: 17 of 30 DJIA component stocks (API availability limit)
-- **Period**: 2009-01-02 to 2022-12-30 (3,524 trading days per ticker)
-- **Features**: OHLCV + RSI(14), MACD(12,26,9), Bollinger Bands(20,2), daily return, volume change, close-open ratio, high-low spread
-- **Output**: `data/processed/djia_processed.feather` (59,347 rows, 18 columns, zero NaN)
+- **Source**: ARF Data API (primary) + yfinance (fallback for 12 tickers)
+- **Universe**: 29 of 30 DJIA component stocks (WBA delisted)
+- **Period**: 2009-01-02 to 2022-12-30
+- **Features**: OHLCV + RSI(14), MACD(12,26,9), Bollinger Bands(20,2) + optional daily return, volume change, close-open ratio, high-low spread
+- **Output**: `data/processed/djia_processed.feather` (98,670 rows, 18 columns, zero NaN)
+- **Baselines**: `data/processed/baseline_data.feather` (1/N, vol-targeted, momentum)
 
 ## Project Structure
 
@@ -40,11 +41,11 @@ python3 -m src.features.build_features
 src/
   backtest.py          # ARF standard backtest framework
   data/
-    downloader.py      # DJIA data download from ARF API
+    downloader.py      # DJIA data download (ARF API + yfinance fallback)
   features/
-    build_features.py  # Technical indicator computation
+    build_features.py  # Technical indicators (paper_only mode) + baseline generation
 tests/
-  test_data_integrity.py  # Data integrity and leakage tests (13 tests)
+  test_data_integrity.py  # Data integrity and leakage tests (16 tests)
 notebooks/
   01_data_exploration.ipynb  # Data exploration and visualization
 reports/
@@ -64,6 +65,8 @@ Each cycle produces:
 
 Phase 2 focuses on data pipeline and feature engineering. Trading metrics will be populated in subsequent phases. See `reports/cycle_2/metrics.json` for details.
 
-- Data pipeline: 17 tickers, 59,347 processed rows
+- Data pipeline: 29 tickers (17 ARF API + 12 yfinance), 98,670 processed rows
 - Technical indicators: RSI(14), MACD(12,26,9), BB(20,2) + 4 additional features
-- Data integrity: 13/13 tests passing, zero NaN, no leakage detected
+- Paper-only mode available via `paper_only=True` flag
+- Baseline Sharpe ratios: 1/N = 1.03, Vol-targeted = 1.15, Momentum = 1.60
+- Data integrity: 16/16 tests passing, zero NaN, no leakage detected

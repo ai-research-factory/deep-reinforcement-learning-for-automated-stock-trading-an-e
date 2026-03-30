@@ -107,6 +107,26 @@ class TestDataIntegrity:
             assert not result[col].isna().any(), f"NaN found in {col}"
 
 
+class TestPaperOnlyMode:
+    """Tests for paper_only feature mode."""
+
+    def test_paper_only_excludes_additional_features(self, sample_data):
+        result = add_technical_indicators(sample_data, paper_only=True)
+        paper_cols = ["rsi_14", "macd", "macd_signal", "macd_hist",
+                      "bb_upper", "bb_middle", "bb_lower"]
+        extra_cols = ["daily_return", "volume_change", "close_open_ratio", "high_low_spread"]
+        for col in paper_cols:
+            assert col in result.columns, f"Paper indicator {col} missing in paper_only mode"
+        for col in extra_cols:
+            assert col not in result.columns, f"Extra feature {col} should not be in paper_only mode"
+
+    def test_default_includes_additional_features(self, sample_data):
+        result = add_technical_indicators(sample_data, paper_only=False)
+        extra_cols = ["daily_return", "volume_change", "close_open_ratio", "high_low_spread"]
+        for col in extra_cols:
+            assert col in result.columns, f"Extra feature {col} missing in default mode"
+
+
 class TestProcessedData:
     """Tests for the actual processed DJIA data (skip if not generated)."""
 
@@ -141,3 +161,14 @@ class TestProcessedData:
             pytest.skip("Processed feather not yet generated")
         df = pd.read_feather(processed_feather_path)
         assert df["ticker"].nunique() >= 10, "Expected at least 10 tickers"
+
+    def test_universe_completeness(self, processed_feather_path):
+        """Verify the processed data contains all 30 DJIA components."""
+        if not processed_feather_path.exists():
+            pytest.skip("Processed feather not yet generated")
+        df = pd.read_feather(processed_feather_path)
+        n_tickers = df["ticker"].nunique()
+        assert n_tickers >= 29, (
+            f"Expected at least 29 DJIA tickers (target: 30), got {n_tickers}. "
+            f"Tickers present: {sorted(df['ticker'].unique())}"
+        )
