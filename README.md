@@ -18,8 +18,52 @@ pytest tests/
 
 Data is fetched from the ARF Data API at runtime. Do not commit data files.
 
+```bash
+# Download DJIA data
+python3 -m src.data.downloader
+
+# Process features
+python3 -m src.features.build_features
+```
+
+### Data Pipeline (Cycle 2)
+
+- **Source**: ARF Data API (`https://ai.1s.xyz/api/data/ohlcv`)
+- **Universe**: 17 of 30 DJIA component stocks (API availability limit)
+- **Period**: 2009-01-02 to 2022-12-30 (3,524 trading days per ticker)
+- **Features**: OHLCV + RSI(14), MACD(12,26,9), Bollinger Bands(20,2), daily return, volume change, close-open ratio, high-low spread
+- **Output**: `data/processed/djia_processed.feather` (59,347 rows, 18 columns, zero NaN)
+
+## Project Structure
+
+```
+src/
+  backtest.py          # ARF standard backtest framework
+  data/
+    downloader.py      # DJIA data download from ARF API
+  features/
+    build_features.py  # Technical indicator computation
+tests/
+  test_data_integrity.py  # Data integrity and leakage tests (13 tests)
+notebooks/
+  01_data_exploration.ipynb  # Data exploration and visualization
+reports/
+  cycle_2/             # Cycle 2 outputs (metrics, findings, preflight)
+docs/
+  open_questions.md    # Known limitations and open questions
+```
+
 ## Reports
 
 Each cycle produces:
 - `reports/cycle_N/metrics.json` — Structured metrics
 - `reports/cycle_N/technical_findings.md` — Technical summary
+- `reports/cycle_N/preflight.md` — Data integrity preflight checks
+
+## Results (Cycle 2)
+
+Phase 2 focuses on data pipeline and feature engineering. Trading metrics will be populated in subsequent phases. See `reports/cycle_2/metrics.json` for details.
+
+- Data pipeline: 17 tickers, 59,347 processed rows
+- Technical indicators: RSI(14), MACD(12,26,9), BB(20,2) + 4 additional features
+- Data integrity: 13/13 tests passing, zero NaN, no leakage detected

@@ -1,0 +1,45 @@
+{
+  "sharpeRatio": 0.0,
+  "annualReturn": 0.0,
+  "maxDrawdown": 0.0,
+  "hitRate": 0.0,
+  "totalTrades": 0,
+  "transactionCosts": {
+    "feeBps": 10,
+    "slippageBps": 5,
+    "netSharpe": 0.0
+  },
+  "walkForward": {
+    "windows": 0,
+    "positiveWindows": 0,
+    "avgOosSharpe": 0.0
+  },
+  "customMetrics": {
+    "phase": "data_pipeline_and_feature_engineering",
+    "total_rows_raw": 59908,
+    "total_rows_processed": 59347,
+    "num_tickers": 17,
+    "num_tickers_target": 30,
+    "ticker_coverage_pct": 56.7,
+    "date_range_start": "2009-01-02",
+    "date_range_end": "2022-12-30",
+    "trading_days_per_ticker": 3491,
+    "num_features": 18,
+    "technical_indicators": ["rsi_14", "macd", "macd_signal", "macd_hist", "bb_upper", "bb_middle", "bb_lower"],
+    "additional_features": ["daily_return", "volume_change", "close_open_ratio", "high_low_spread"],
+    "nan_count_after_processing": 0,
+    "warmup_rows_dropped": 561,
+    "data_integrity_tests_passed": 13,
+    "data_integrity_tests_total": 13,
+    "baseline_1n_sharpe": 0.0,
+    "baseline_1n_return": 0.0,
+    "baseline_1n_drawdown": 0.0,
+    "baseline_voltarget_sharpe": 0.0,
+    "baseline_momentum_sharpe": 0.0,
+    "strategy_vs_1n_sharpe_diff": 0.0,
+    "strategy_vs_1n_return_diff": 0.0,
+    "strategy_vs_1n_drawdown_diff": 0.0,
+    "strategy_vs_1n_turnover_ratio": 0.0,
+    "strategy_vs_1n_cost_sensitivity": "N/A - Phase 2 (data pipeline only)"
+  }
+}
