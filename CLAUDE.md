@@ -7,7 +7,7 @@ proj_5e275486
 ReinforcementLearning
 
 ## Current Cycle
-2
+3
 
 ## Objective
 Implement, validate, and iteratively improve the paper's approach with production-quality standards.
@@ -69,7 +69,7 @@ df = df.set_index("timestamp")
 
 ## Preflight チェック（実装開始前に必ず実施）
 
-**Phase の実装コードを書く前に**、以下のチェックを実施し結果を `reports/cycle_2/preflight.md` に保存すること。
+**Phase の実装コードを書く前に**、以下のチェックを実施し結果を `reports/cycle_3/preflight.md` に保存すること。
 
 ### 1. データ境界表
 以下の表を埋めて、未来データ混入がないことを確認:
@@ -105,24 +105,26 @@ df = df.set_index("timestamp")
 
 **preflight.md が作成されるまで、Phase の実装コードに進まないこと。**
 
-## ★ 今回のタスク (Cycle 2)
+## ★ 今回のタスク (Cycle 3)
 
 
-### Phase 2: データパイプラインと特徴量エンジニアリング [Track ]
+### Phase 3: マルチエージェントとアンサンブル戦略の実装 [Track ]
 
 **Track**:  (A=論文再現 / B=近傍改善 / C=独自探索)
-**ゴール**: DJIA 30銘柄のデータをyfinanceから取得し、論文で想定される技術指標を計算して保存する。
+**ゴール**: A2CとDDPGエージェントを実装し、3つのエージェントの決定を統合する多数決アンサンブル戦略を実装する。
 
 **具体的な作業指示**:
-1. `src/data/downloader.py`に`download_djia_data`関数を実装する。2009-01-01から2022-12-31までのDJIA 30銘柄の日足OHLCVデータをyfinanceから取得し、`data/raw/djia_data.csv`に保存する。2. `src/features/build_features.py`に`add_technical_indicators`関数を実装する。この関数はDataFrameを入力とし、RSI(14), MACD(12,26,9), Bollinger Bands(20,2)などの標準的な技術指標を計算して列として追加する。3. `notebooks/01_data_exploration.ipynb`を作成し、ダウンロードしたデータを読み込み、欠損値の確認、基本統計量の表示、および数銘柄の価格チャートと技術指標を可視化する。4. 処理済みのデータを`data/processed/djia_processed.feather`として保存するスクリプトを作成する。
+1. `src/agents/`ディレクトリに`a2c_agent.py`と`ddpg_agent.py`を追加し、PPOと同様のインターフェースでstable-baselines3のA2CとDDPGをラップする。2. `src/environments/multi_asset_env.py`を作成し、複数銘柄を同時に取引できる`MultiAssetTradingEnv`を実装する。状態空間には全銘柄のデータを含める。3. `src/ensemble/voting.py`に`MajorityVoteEnsemble`クラスを実装する。このクラスは初期化時に3つのエージェントモデルを受け取り、`predict`メソッドで各エージェントの行動予測を取得し、銘柄ごとに多数決で最終的な行動を決定する。
 
 **期待される出力ファイル**:
-- data/processed/djia_processed.feather
-- notebooks/01_data_exploration.ipynb
+- src/agents/a2c_agent.py
+- src/agents/ddpg_agent.py
+- src/ensemble/voting.py
+- src/environments/multi_asset_env.py
 
 **受入基準 (これを全て満たすまで完了としない)**:
-- djia_processed.featherファイルが生成され、技術指標の列が含まれている。
-- 探索ノートブックでデータの欠損値が処理されていることが確認できる。
+- 3つのエージェント（PPO, A2C, DDPG）をそれぞれ個別に学習させることができる。
+- MajorityVoteEnsembleが3つのエージェントからの入力を受け取り、単一の行動配列を返すことができる。
 
 
 
@@ -137,83 +139,28 @@ df = df.set_index("timestamp")
 
 
 ## スコア推移
-Cycle 1: 60%
+Cycle 1: 60% → Cycle 2: 65%
 
-
-
-## 前回の結果
-# Technical Findings — Cycle 2: Data Pipeline and Feature Engineering
-
-## Implementation Summary
-
-### Data Pipeline (`src/data/downloader.py`)
-- Implemented `download_djia_data()` function that fetches OHLCV data from the ARF Data API
-- Downloads 17 available DJIA component stocks (out of 30 total) for the period 2009-01-01 to 2022-12-31
-- Rate-limited requests (0.5s between tickers) to avoid API overload
-- Output: `data/raw/djia_data.csv` with 59,908 rows (17 tickers x 3,524 trading days)
-
-### Feature Engineering (`src/features/build_features.py`)
-- Implemented `add_technical_indicators()` function with the following indicators:
-  - **RSI(14)**: Relative Strength Index using EWM (Wilder's smoothing)
-  - **MACD(12, 26, 9)**: MACD line, signal line, and histogram
-  - **Bollinger Bands(20, 2)**: Upper, middle, and lower bands
-  - **Daily return**: Close-to-close percentage change
-  - **Volume change**: Volume percentage change
-  - **Close-open ratio**: Intraday price movement indicator
-  - **High-low spread**: Normalized daily price range
-- All indicators computed per-ticker with proper grouping
-- Warmup rows (33 per ticker, 561 total) dropped to eliminate NaN from indicator initialization
-- Output: `data/processed/djia_processed.feather` with 59,347 rows and 18 columns
-
-### Data Integrity
-- Zero NaN values in the processed dataset
-- No future data leakage confirmed (all rolling windows use `center=False`, all EWMs are backward-looking)
-- No duplicate ticker-date combinations
-- RSI values bounded within [0, 100]
-- Bollinger Band ordering verified: upper >= middle >= lower
-- 13/13 tests passing
-
-## Key Observations
-
-1. **Universe Coverage**: 17/30 DJIA stocks available via ARF API (56.7%). Missing stocks documented in `docs/open_questions.md`. This is a known limitation that may reduce diversification benefits in the ensemble strategy.
-
-2. **Data Quality**: All 17 tickers have identical date coverage (3,524 trading days from 2009-01-02 to 2022-12-30), making panel alignment straightforward.
-
-3. **Indicator Parameters**: All match the paper specification — RSI(14), MACD(12,26,9), Bollinger Bands(20,2).
-
-4. **Trading Metrics**: All trading-related metrics (Sharpe, returns, etc.) are set to 0.0 in metrics.json as this phase covers data pipeline only. These will be populated in subsequent phases.
-
-## Files Created/Modified
-- `src/data/__init__.py` — Package init
-- `src/data/downloader.py` — ARF API data downloader
-- `src/features/__init__.py` — Package init
-- `src/features/build_features.py` — Technical indicator computation
-- `tests/test_data_integrity.py` — 13 tests for data integrity and leakage prevention
-- `notebooks/01_data_exploration.ipynb` — Data exploration and visualization notebook
-- `reports/cycle_2/preflight.md` — Preflight checks
-- `reports/cycle_2/metrics.json` — Metrics (data phase, trading metrics N/A)
-- `reports/cycle_2/technical_findings.md` — This file
-- `docs/open_questions.md` — Open questions and limitations
 
 
 
 
 ## レビューからのフィードバック
 ### レビュー改善指示
-1. 【最重要】ユニバース再現性の向上計画の策定：次サイクルでモデル実装に入る前に、データソース問題を解決する。`src/data/downloader.py`を修正し、論文同様に`yfinance`ライブラリをフォールバックとして使用し、ARF APIで取得できない残り13銘柄を補完する機能を実装する。`DJIA_30_FULL`リストを活用し、30銘柄全てを揃えることを目指す。これにより`universeFidelity`が向上し、再現実験の信頼性が高まる。
-2. 【重要】特徴量セットの明確化と分離：`src/features/build_features.py`の`add_technical_indicators`関数に、論文準拠の特徴量のみを生成する`strict=True`のようなフラグを追加する。デフォルトでは論文通りの特徴量セットとし、追加特徴量はオプションで生成できるようにする。これにより、純粋な再現実験と、特徴量を追加した拡張実験を明確に区別できるようになる。
-3. 【推奨】ベースライン戦略データセットの準備：次のサイクルでRLモデルと比較するために、単純なベースライン戦略（例：Buy & Hold）の評価に必要なデータを準備する。例えば、`reports/cycle_2/metrics.json`に`baseline_1n_sharpe`等の項目があるが、これを計算するためのポートフォリオレベルの価格系列（例：均等加重ポートフォリオのインデックス）を`data/processed/baseline_data.feather`として生成するスクリプトを`src/features`に追加する。
+1. [object Object]
+2. [object Object]
+3. [object Object]
 ### マネージャー指示 (次のアクション)
-1. 【最優先】`src/data/get_raw_data.py`を修正し、ARF APIで取得できないDJIA 13銘柄を補完するため、`yfinance`ライブラリを代替データソースとして利用するロジックを追加する。取得したデータは既存のパイプラインと互換性のある形式に整形し、`data/raw`ディレクトリに保存すること。
-2. 【重要】`tests/test_data_integrity.py`に、`data/processed`に保存された最終的なfeatherファイルがDJIA 30銘柄すべてのデータを含んでいることを検証するテスト `test_universe_completeness` を追加する。このテストは `len(df['tic'].unique()) == 30` をアサーションすること。
-3. 【推奨】`src/features/build_features.py`に、論文で指定された特徴量（RSI, MACD, BB）のみを生成するモードを追加する。具体的には、`config.yml`に`features.use_paper_only: true`のような設定項目を設け、このフラグに応じて追加特徴量の計算をスキップするロジックを実装する。これにより、論文再現と独自探索の切り替えを容易にする。
+1. 【最優先】`src/environment.py`にOpenAI Gym(nasium)インターフェースに準拠した`TradingEnv`クラスを実装する。状態空間は過去の価格・指標データ、行動空間はポートフォリオの目標ウェイト、報酬はポートフォリオ価値の変化率（リターン）として定義する。
+2. 【重要】`src/agents.py`に`stable-baselines3`ライブラリを用いてPPOエージェントのラッパークラスを実装する。このクラスは`TradingEnv`を受け取り、学習（`learn`）および予測（`predict`）メソッドを提供する。
+3. 【推奨】`src/backtest.py`を拡張し、学習済みPPOエージェントをロードして1期間のバックテストを実行するロジックを追加する。エージェントの行動（目標ウェイト）に基づいてリバランスを行い、日々のPnLを計算して`reports/pnl_ppo_initial.csv`として保存する機能を実装する。
 
 
 ## 全体Phase計画 (参考)
 
 ✓ Phase 1: シングルエージェント(PPO)と取引環境の実装 — 単一銘柄を対象に、PPOエージェントが学習・取引できる基本的なGym環境を実装する。
-→ Phase 2: データパイプラインと特徴量エンジニアリング — DJIA 30銘柄のデータをyfinanceから取得し、論文で想定される技術指標を計算して保存する。
-  Phase 3: マルチエージェントとアンサンブル戦略の実装 — A2CとDDPGエージェントを実装し、3つのエージェントの決定を統合する多数決アンサンブル戦略を実装する。
+✓ Phase 2: データパイプラインと特徴量エンジニアリング — DJIA 30銘柄のデータをyfinanceから取得し、論文で想定される技術指標を計算して保存する。
+→ Phase 3: マルチエージェントとアンサンブル戦略の実装 — A2CとDDPGエージェントを実装し、3つのエージェントの決定を統合する多数決アンサンブル戦略を実装する。
   Phase 4: バックテストエンジンとコストモデルの実装 — 取引コストを考慮したベクトル化バックテストエンジンを実装し、アンサンブル戦略のパフォーマンスを評価する。
   Phase 5: ウォークフォワード検証フレームワークの構築 — 論文の再現性を担保するため、厳密なウォークフォワード検証を実装し、複数期間での性能を評価する。
   Phase 6: ハイパーパラメータ最適化 (Optuna) — 論文のデフォルト値近傍で各DRLエージェントの主要ハイパーパラメータを最適化し、性能向上を図る。
@@ -307,9 +254,9 @@ Cycle 1: 60%
 
 ## 出力ファイル
 以下のファイルを保存してから完了すること:
-- `reports/cycle_2/preflight.md` — Preflight チェック結果（必須、実装前に作成）
-- `reports/cycle_2/metrics.json` — 下記スキーマに従う（必須）
-- `reports/cycle_2/technical_findings.md` — 実装内容、結果、観察事項
+- `reports/cycle_3/preflight.md` — Preflight チェック結果（必須、実装前に作成）
+- `reports/cycle_3/metrics.json` — 下記スキーマに従う（必須）
+- `reports/cycle_3/technical_findings.md` — 実装内容、結果、観察事項
 
 ### metrics.json 必須スキーマ（Single Source of Truth）
 ```json
