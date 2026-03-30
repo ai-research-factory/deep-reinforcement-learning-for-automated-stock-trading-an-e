@@ -1,0 +1,6 @@
+[project]
+name = "deep-reinforcement-learning-for-automated-stock-trading-an-e"
+version = "0.1.0"
+description = "Deep Reinforcement Learning for Automated Stock Trading: An Ensemble Strategy"
+requires-python = ">=3.10"
+dependencies = ["numpy", "pandas", "scikit-learn", "torch", "matplotlib", "tqdm"]
